@@ -249,6 +249,8 @@ describe.skipIf(!hasDatabase)('artwork ingest', () => {
       expect(await storage.list(`artwork/${orgs.alpha}/${original.artworkId}`)).toEqual(before);
     });
 
+    // Two edits each run the whole pipeline at once. On CI's two-core runner that contends with the
+    // other test files and takes 3.5 to 6 s, against 1.4 s locally, so the 5 s default is too tight.
     it('rejects stale saves, including competing edits, without orphaned assets', async () => {
       const original = await upload(33);
       const results = await Promise.allSettled([
@@ -265,7 +267,7 @@ describe.skipIf(!hasDatabase)('artwork ingest', () => {
       await expect(
         editArtwork(sql, storage, alpha(), original.artworkId, edit(original)),
       ).rejects.toMatchObject({ code: 'version_conflict' });
-    });
+    }, 30_000);
 
     it('refuses cross-tenant reads/edits and invalid dimensions before writing files', async () => {
       const original = await upload(34);
@@ -282,6 +284,7 @@ describe.skipIf(!hasDatabase)('artwork ingest', () => {
       expect(await storage.list(`artwork/${orgs.alpha}/${original.artworkId}`)).toEqual(before);
     });
 
+    // Same concurrent pipeline cost as the test above.
     it('reports concurrent duplicate edits and removes their staged assets', async () => {
       const originals = [await upload(35), await upload(36)];
       let arrivals = 0;
@@ -315,7 +318,7 @@ describe.skipIf(!hasDatabase)('artwork ingest', () => {
         originals.map((original) => storage.list(`artwork/${orgs.alpha}/${original.artworkId}`)),
       );
       expect(keys.map((items) => items.length).sort()).toEqual([4, 8]);
-    });
+    }, 30_000);
   });
 
   describe('managing the library (F-ART-06)', () => {
