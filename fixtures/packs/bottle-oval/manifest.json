@@ -1,0 +1,188 @@
+{
+  "manifestVersion": 1,
+  "key": "bottle-oval",
+  "version": "1.0.0",
+  "name": "Oval bottles",
+  "description": "Reference pack: an oval-section bottle whose flank curves in two directions, so relief on it cannot be laid out by projecting a flat grid.",
+  "license": "CC0-1.0",
+  "environments": [
+    "studio-softbox"
+  ],
+  "materials": [
+    {
+      "key": "pp-matte",
+      "name": "Matte",
+      "family": "plastic",
+      "finish": "matte",
+      "colorizable": true,
+      "base": {
+        "baseColorHex": "#1b4d3e",
+        "roughness": 0.62,
+        "metallic": 0,
+        "ior": 1.49,
+        "specular": 0.45
+      }
+    },
+    {
+      "key": "pp-gloss",
+      "name": "Glossy",
+      "family": "plastic",
+      "finish": "pearlescent",
+      "colorizable": true,
+      "base": {
+        "baseColorHex": "#dfe4ea",
+        "roughness": 0.28,
+        "metallic": 0,
+        "ior": 1.49,
+        "specular": 0.55,
+        "clearcoat": 0.55,
+        "clearcoatRoughness": 0.1,
+        "sheen": 0.35
+      }
+    }
+  ],
+  "products": [
+    {
+      "key": "bottle-oval",
+      "name": "Oval bottle",
+      "category": "bottles",
+      "facets": {
+        "shape": "oval",
+        "closure": "screw"
+      },
+      "variants": [
+        {
+          "key": "500ml",
+          "name": "500 ml",
+          "dimensionsMm": {
+            "bbox": [
+              [
+                -30,
+                0,
+                -20
+              ],
+              [
+                30,
+                110,
+                20
+              ]
+            ],
+            "width": 60,
+            "depth": 40,
+            "height": 110
+          },
+          "assets": {
+            "lod0": {
+              "path": "meshes/bottle-oval/500ml/lod0.glb"
+            },
+            "lod1": {
+              "path": "meshes/bottle-oval/500ml/lod1.glb"
+            },
+            "renderMesh": {
+              "path": "meshes/bottle-oval/500ml/render.glb"
+            }
+          },
+          "materialSlots": [
+            {
+              "key": "bottle-body",
+              "label": "Bottle body",
+              "defaultMaterialKey": "pp-matte",
+              "allowedFamilies": [
+                "plastic"
+              ],
+              "colorizable": true,
+              "allowedFinishes": []
+            }
+          ],
+          "zones": [
+            {
+              "type": "conformal",
+              "key": "flank",
+              "name": "Front flank",
+              "frame": {
+                "originMm": [
+                  30,
+                  38,
+                  0
+                ],
+                "normal": [
+                  1,
+                  0,
+                  0
+                ],
+                "tangent": [
+                  0,
+                  0,
+                  -1
+                ],
+                "maxProjectionDepthMm": 15
+              },
+              "sizeMm": {
+                "width": 45,
+                "height": 35,
+                "safeMarginMm": 2
+              },
+              "constraints": {
+                "finishes": [
+                  "emboss",
+                  "deboss",
+                  "print"
+                ],
+                "maxDepthMm": 0.5,
+                "minStrokeMm": 0.3,
+                "maxCoverage": 0.85,
+                "wrapWarnDeg": 120
+              }
+            }
+          ],
+          "cameraPresets": [
+            {
+              "key": "three-quarter",
+              "label": "Three-quarter",
+              "azimuthDeg": 35,
+              "elevationDeg": 12,
+              "radiusScale": 2.2,
+              "focalMm": 85,
+              "targetOffsetMm": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "key": "front",
+              "label": "Front",
+              "azimuthDeg": 0,
+              "elevationDeg": 2,
+              "radiusScale": 2.3,
+              "focalMm": 100,
+              "targetOffsetMm": [
+                0,
+                0,
+                0
+              ]
+            },
+            {
+              "key": "flank-close",
+              "label": "Flank close-up",
+              "azimuthDeg": 8,
+              "elevationDeg": 4,
+              "radiusScale": 1.15,
+              "focalMm": 120,
+              "targetOffsetMm": [
+                0,
+                38,
+                0
+              ]
+            }
+          ],
+          "capabilities": {
+            "transmission": false,
+            "video": true,
+            "deformable": false
+          }
+        }
+      ]
+    }
+  ]
+}

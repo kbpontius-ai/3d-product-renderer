@@ -1,0 +1,38 @@
+# What the daemon does not need, and what actively breaks a build if it arrives.
+#
+# `node_modules` is the important one. The images run `pnpm install --frozen-lockfile`, and pnpm's
+# tree is a forest of symlinks into a content-addressed store; copying a host one over it gives the
+# build a tree whose links point at paths that do not exist in the image. `COPY packages packages`
+# would do exactly that for every workspace package. It also happens to be 632 MB.
+
+node_modules
+**/node_modules
+
+# Build output — regenerated in the image, and stale copies shadow the fresh ones.
+.next
+**/.next
+dist
+**/dist
+*.tsbuildinfo
+
+# Local state: a throwaway PostgreSQL cluster, an object store, render scratch. 601 MB, and none of
+# it belongs in an image.
+.tmp
+test-results
+playwright-report
+
+.git
+.github
+
+# Local secrets, and the deployment's own env file. Neither is ever baked into an image.
+.env
+.env.*
+!.env.example
+deploy/.env
+
+# The e2e suite and its browsers do not run in production.
+apps/web/e2e
+load
+
+*.log
+.DS_Store

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="0 0 40 30">
+  <style>.curve { fill:none; stroke:currentColor; stroke-width:1.2; stroke-linecap:round; stroke-linejoin:round } .dashed { stroke-dasharray:2 1 3; stroke-dashoffset:1.3 }</style>
+  <g color="red" fill="currentColor">
+    <path id="child-current-color" color="blue" d="M2 2H8V7H2Z"/>
+    <path id="curved-stroke" class="curve" color="blue" d="M3 13C8 4 12 22 18 13S28 9 35 14"/>
+    <path id="odd-dash-pattern" class="curve dashed" color="blue" d="M3 23H35"/>
+    <path id="zero-length-round-dots" class="curve" color="blue" stroke-dasharray="0 3" d="M3 28H35"/>
+  </g>
+</svg>

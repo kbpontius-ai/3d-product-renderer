@@ -1,0 +1,160 @@
+# One droplet (F-SHIP-03).
+#
+#   cd deploy && cp .env.production.example .env && $EDITOR .env
+#   docker compose up -d --build
+#
+# Scoped to a single machine on purpose. `packages/storage` has a local-filesystem adapter and
+# nothing else, so the web app and the render worker have to share a disk — hence the `storage`
+# volume mounted into both, and hence no second replica of either until F-SHIP-08 lands.
+
+name: 3d-product-renderer
+
+x-app-env: &app-env
+  DATABASE_URL: postgres://product_renderer:${POSTGRES_APP_PASSWORD:?set POSTGRES_APP_PASSWORD}@postgres:5432/product_renderer
+  STORAGE_ROOT: /var/lib/3d-product-renderer/storage
+  APP_URL: ${APP_URL:?set APP_URL}
+  ASSET_URL_SECRET: ${ASSET_URL_SECRET:?set ASSET_URL_SECRET}
+  LOG_FORMAT: json
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # Outside development the admin console never shows an invitation link, so without these nobody
+  # past the first account can be invited and nobody can reset a password. Empty is allowed and
+  # means no mail is sent (docs/27-deployment.md).
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  MAIL_FROM: ${MAIL_FROM:-}
+  MAIL_REPLY_TO: ${MAIL_REPLY_TO:-}
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      # Bootstrapped as `postgres`, deliberately, and the application role is created separately by
+      # the init script below.
+      #
+      # Naming `product_renderer` here would make it the cluster's superuser, and a superuser bypasses
+      # every row-level security policy — silently, including under `force row level security`.
+      # Every tenancy guarantee in this product is an RLS policy, so that one line would turn them
+      # all off with nothing to see, and the tenancy tests would still pass.
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?set POSTGRES_SUPERUSER_PASSWORD}
+      POSTGRES_DB: product_renderer
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs once, on an empty data directory.
+      - ./postgres/10-app-role.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d product_renderer']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Runs to completion before the web app starts, and again on every `up`. Migrations are the one
+  # thing that must not race two processes, so it is its own one-shot service rather than something
+  # the web container does at boot.
+  migrate:
+    # The web image, not a second build of it. The two are byte-identical — same Dockerfile, same
+    # context — so giving `migrate` its own `build:` made every `up --build` compile the Next
+    # application twice, in parallel, on whatever machine is deploying.
+    image: 3d-product-renderer-web
+    restart: 'no'
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # `tsx` directly, and from the repository root rather than the image's `apps/web` working
+    # directory. Not `pnpm db:migrate`: corepack fetches pnpm from the registry on first use, and
+    # its cache is not in what the runtime stage copies — so the one step that must succeed before
+    # anything else starts would depend on the npm registry being reachable from the droplet.
+    working_dir: /app
+    command: ['node', '--import', 'tsx', 'scripts/db-migrate.ts']
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web/Dockerfile
+    # Named, because `migrate` above runs this image rather than building its own copy.
+    image: 3d-product-renderer-web
+    restart: unless-stopped
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - storage:/var/lib/3d-product-renderer/storage
+    healthcheck:
+      # Checks the database and the object store, not just the port — see /api/health.
+      test: ['CMD-SHELL', 'node -e "fetch(\"http://127.0.0.1:3000/api/health\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  worker-render:
+    build:
+      context: ..
+      dockerfile: deploy/worker-render/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      RENDER_THREADS: ${RENDER_THREADS:-2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      # The same disk the web app writes packs and artwork to, and reads finished renders from.
+      - storage:/var/lib/3d-product-renderer/storage
+
+  # Off unless asked for: `docker compose --profile cad up -d`.
+  #
+  # Adds about a gigabyte for OCCT and Python, and is only needed to turn a supplier's STEP file
+  # into a draft Product Pack. Packs can be uploaded directly at /admin/packs without it.
+  worker-cad:
+    profiles: ['cad']
+    build:
+      context: ..
+      dockerfile: deploy/cad-worker/Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *app-env
+      # `require`, not the default `prefer`. On a laptop reading your own files, parsing unconfined
+      # is a reasonable trade; on a machine taking a stranger's CAD file it is not, so the worker
+      # refuses to start rather than do it.
+      CAD_SANDBOX: require
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - storage:/var/lib/3d-product-renderer/storage
+    # The namespaces the inner sandbox builds; see deploy/cad-worker/README.md.
+    security_opt:
+      - seccomp=./cad-worker/seccomp.json
+      - no-new-privileges:true
+    cap_drop: ['ALL']
+    cap_add: ['SETUID', 'SETGID']
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ['80:80', '443:443']
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?set APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on:
+      web:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  storage:
+  caddydata:
+  caddyconfig:

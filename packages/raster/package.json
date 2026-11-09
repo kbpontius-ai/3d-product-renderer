@@ -1,0 +1,22 @@
+{
+  "name": "@pr/raster",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pr/design-schema": "workspace:*",
+    "@pr/svg": "workspace:*",
+    "clipper-lib": "6.4.2"
+  },
+  "devDependencies": {
+    "@types/clipper-lib": "6.4.0"
+  }
+}

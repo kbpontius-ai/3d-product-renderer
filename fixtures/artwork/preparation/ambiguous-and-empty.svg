@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30mm" height="20mm" viewBox="0 0 30 20">
+  <path id="first" d="M2 4H10" fill="none" stroke="black"/>
+  <path id="second" d="M10 4L18 8" fill="none" stroke="black"/>
+  <path id="third" d="M10 4L18 2" fill="none" stroke="black"/>
+  <path id="unpainted" d="M4 14H14" fill="none" stroke="none"/>
+  <path id="hidden" d="M20 14H28V18H20Z" display="none"/>
+</svg>

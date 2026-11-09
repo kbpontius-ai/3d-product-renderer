@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <title>Wrap — 3D Product Renderer</title>
+  <desc>A continuous ribbon wrapping a curved surface, connecting flat artwork and three-dimensional geometry.</desc>
+  <g fill="#171717">
+    <path d="M716 96C475 114 226 214 226 346C226 382 248 405 283 423C260 392 291 353 366 323C453 288 588 271 716 267V96Z"/>
+    <path d="M466 290C610 280 751 304 764 361C770 386 750 408 717 427C737 402 733 380 710 361C666 326 569 299 466 290Z"/>
+    <path d="M226 371C247 446 436 492 610 451C688 433 750 401 765 370V558C765 686 561 807 326 900V715C461 674 581 622 637 571C467 619 255 567 226 480V371Z"/>
+  </g>
+</svg>

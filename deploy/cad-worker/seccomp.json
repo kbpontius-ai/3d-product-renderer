@@ -1,0 +1,59 @@
+{
+  "_comment": [
+    "Seccomp for the CAD worker (docs/23-cad-ingestion.md).",
+    "",
+    "This is Docker's default profile with one deliberate widening: the namespace syscalls stay",
+    "allowed, because the inner sandbox is built out of them. The default profile blocks unshare",
+    "with CLONE_NEWUSER, and a container running under it would silently lose the nested",
+    "confinement -- the parser would run with the container's own network, which is the one thing",
+    "it must never have.",
+    "",
+    "That trade is worth stating plainly. Allowing unshare/clone/mount gives a process inside the",
+    "container more to work with than the default profile would. What it buys is that the parser --",
+    "the only thing here that reads hostile input -- has no network at all, rather than the",
+    "container's. docs/23 calls no-egress the single highest-value control in this pipeline, and",
+    "this is what pays for it.",
+    "",
+    "The cleaner arrangement, when there is a control plane to drive it, is a separate parser",
+    "container with network_mode: none per job, driven over a socket. Then the profile below can go",
+    "back to the default and the parser needs no namespace syscalls of its own. See README.md."
+  ],
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "defaultErrnoRet": 1,
+  "archMap": [
+    { "architecture": "SCMP_ARCH_X86_64", "subArchitectures": ["SCMP_ARCH_X86", "SCMP_ARCH_X32"] },
+    { "architecture": "SCMP_ARCH_AARCH64", "subArchitectures": ["SCMP_ARCH_ARM"] }
+  ],
+  "syscalls": [
+    {
+      "_comment": "The namespace and mount calls the inner sandbox needs. Everything else here is the ordinary allow-list.",
+      "names": ["unshare", "clone", "clone3", "setns", "mount", "umount2", "pivot_root"],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": [
+        "accept4", "access", "arch_prctl", "bind", "brk", "capget", "capset", "chdir", "chmod",
+        "chown", "close", "close_range", "connect", "copy_file_range", "dup", "dup2", "dup3",
+        "epoll_create1", "epoll_ctl", "epoll_pwait", "epoll_wait", "eventfd2", "execve", "execveat",
+        "exit", "exit_group", "faccessat", "faccessat2", "fadvise64", "fallocate", "fchdir",
+        "fchmod", "fchmodat", "fchown", "fchownat", "fcntl", "fdatasync", "flock", "fork", "fstat",
+        "fstatfs", "fsync", "ftruncate", "futex", "getcwd", "getdents64", "getegid", "geteuid",
+        "getgid", "getgroups", "getpeername", "getpgrp", "getpid", "getppid", "getrandom",
+        "getresgid", "getresuid", "getrlimit", "getrusage", "getsockname", "getsockopt", "gettid",
+        "gettimeofday", "getuid", "ioctl", "kill", "lseek", "lstat", "madvise", "membarrier",
+        "memfd_create", "mkdir", "mkdirat", "mmap", "mprotect", "mremap", "munmap", "nanosleep",
+        "newfstatat", "openat", "openat2", "pipe2", "poll", "ppoll", "prctl", "pread64", "preadv",
+        "prlimit64", "pselect6", "pwrite64", "pwritev", "read", "readlink", "readlinkat", "readv",
+        "recvfrom", "recvmsg", "rename", "renameat", "renameat2", "restart_syscall", "rmdir",
+        "rseq", "rt_sigaction", "rt_sigprocmask", "rt_sigreturn", "sched_getaffinity",
+        "sched_setaffinity", "sched_yield", "sendmsg", "sendto", "set_robust_list", "set_tid_address",
+        "setgid", "setgroups", "setitimer", "setpgid", "setresgid", "setresuid", "setrlimit",
+        "setsid", "setsockopt", "setuid", "shutdown", "sigaltstack", "socket", "socketpair",
+        "stat", "statfs", "statx", "symlink", "symlinkat", "sysinfo", "tgkill", "timerfd_create",
+        "timerfd_settime", "truncate", "umask", "uname", "unlink", "unlinkat", "utimensat", "wait4",
+        "waitid", "write", "writev"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    }
+  ]
+}

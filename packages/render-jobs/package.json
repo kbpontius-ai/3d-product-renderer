@@ -1,0 +1,23 @@
+{
+  "name": "@pr/render-jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pr/catalog": "workspace:*",
+    "@pr/db": "workspace:*",
+    "@pr/design-schema": "workspace:*",
+    "@pr/designs": "workspace:*",
+    "@pr/job-queue": "workspace:*",
+    "@pr/render-spec": "workspace:*",
+    "@pr/artworks": "workspace:*"
+  }
+}

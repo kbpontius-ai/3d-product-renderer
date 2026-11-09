@@ -1,0 +1,231 @@
+{
+  "manifestVersion": 1,
+  "key": "cap-basic",
+  "version": "1.0.0",
+  "name": "Basic closures",
+  "description": "Reference pack: a flat-top screw closure with a top face and a wrap-around skirt.",
+  "license": "CC0-1.0",
+  "environments": [
+    "studio-softbox"
+  ],
+  "materials": [
+    {
+      "key": "pp-matte",
+      "name": "Matte",
+      "family": "plastic",
+      "finish": "matte",
+      "colorizable": true,
+      "base": {
+        "baseColorHex": "#1b4d3e",
+        "roughness": 0.62,
+        "metallic": 0,
+        "ior": 1.49,
+        "specular": 0.45
+      }
+    },
+    {
+      "key": "pp-gloss",
+      "name": "Glossy",
+      "family": "plastic",
+      "finish": "pearlescent",
+      "colorizable": true,
+      "base": {
+        "baseColorHex": "#dfe4ea",
+        "roughness": 0.28,
+        "metallic": 0,
+        "ior": 1.49,
+        "specular": 0.55,
+        "clearcoat": 0.55,
+        "clearcoatRoughness": 0.1,
+        "sheen": 0.35
+      }
+    }
+  ],
+  "products": [
+    {
+      "key": "cap-flat",
+      "name": "Flat-top closure",
+      "category": "closures",
+      "facets": {
+        "closureType": "screw",
+        "neckFinish": "38-400"
+      },
+      "variants": [
+        {
+          "key": "38mm",
+          "name": "38 mm",
+          "dimensionsMm": {
+            "bbox": [
+              [
+                -19,
+                0,
+                -19
+              ],
+              [
+                19,
+                18,
+                19
+              ]
+            ],
+            "diameter": 38,
+            "height": 18
+          },
+          "assets": {
+            "lod0": {
+              "path": "meshes/cap-flat/38mm/lod0.glb"
+            },
+            "lod1": {
+              "path": "meshes/cap-flat/38mm/lod1.glb"
+            },
+            "renderMesh": {
+              "path": "meshes/cap-flat/38mm/render.glb"
+            }
+          },
+          "materialSlots": [
+            {
+              "key": "body",
+              "label": "Cap body",
+              "defaultMaterialKey": "pp-matte",
+              "allowedFamilies": [
+                "plastic"
+              ],
+              "colorizable": true,
+              "allowedFinishes": []
+            },
+            {
+              "key": "liner",
+              "label": "Liner",
+              "defaultMaterialKey": "pp-gloss",
+              "allowedFamilies": [
+                "plastic"
+              ],
+              "colorizable": true,
+              "allowedFinishes": []
+            }
+          ],
+          "zones": [
+            {
+              "type": "planar",
+              "key": "top",
+              "name": "Top face",
+              "frame": {
+                "originMm": [
+                  0,
+                  18,
+                  0
+                ],
+                "normal": [
+                  0,
+                  1,
+                  0
+                ],
+                "tangent": [
+                  1,
+                  0,
+                  0
+                ]
+              },
+              "sizeMm": {
+                "width": 30,
+                "height": 30,
+                "safeMarginMm": 1.5
+              },
+              "uvRect": {
+                "u0": 0.02,
+                "v0": 0.52,
+                "u1": 0.48,
+                "v1": 0.98
+              },
+              "constraints": {
+                "finishes": [
+                  "emboss",
+                  "deboss",
+                  "print"
+                ],
+                "maxDepthMm": 0.6,
+                "minStrokeMm": 0.25,
+                "maxCoverage": 0.9,
+                "wrapWarnDeg": 120
+              }
+            },
+            {
+              "type": "cylindrical",
+              "key": "skirt",
+              "name": "Skirt",
+              "frame": {
+                "axisOriginMm": [
+                  0,
+                  0,
+                  0
+                ],
+                "axisDir": [
+                  0,
+                  1,
+                  0
+                ],
+                "radiusMm": 19,
+                "centerAngleDeg": 0,
+                "centerHeightMm": 8
+              },
+              "sizeMm": {
+                "arcWidthMm": 40,
+                "height": 10,
+                "safeMarginMm": 1
+              },
+              "constraints": {
+                "finishes": [
+                  "emboss",
+                  "deboss",
+                  "print"
+                ],
+                "maxDepthMm": 0.4,
+                "minStrokeMm": 0.3,
+                "maxCoverage": 0.8,
+                "wrapWarnDeg": 120
+              }
+            }
+          ],
+          "cameraPresets": [
+            {
+              "key": "three-quarter",
+              "label": "Three-quarter",
+              "azimuthDeg": 35,
+              "elevationDeg": 25,
+              "radiusScale": 2.4,
+              "focalMm": 85
+            },
+            {
+              "key": "front",
+              "label": "Front",
+              "azimuthDeg": 0,
+              "elevationDeg": 5,
+              "radiusScale": 2.6,
+              "focalMm": 100
+            },
+            {
+              "key": "top",
+              "label": "Top",
+              "azimuthDeg": 0,
+              "elevationDeg": 88,
+              "radiusScale": 2.2,
+              "focalMm": 85
+            },
+            {
+              "key": "macro-logo",
+              "label": "Logo close-up",
+              "azimuthDeg": 20,
+              "elevationDeg": 45,
+              "radiusScale": 1.3,
+              "focalMm": 120
+            }
+          ],
+          "capabilities": {
+            "transmission": false,
+            "video": true,
+            "deformable": false
+          }
+        }
+      ]
+    }
+  ]
+}

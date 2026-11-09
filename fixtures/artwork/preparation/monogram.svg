@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="0 0 40 30">
+  <style>.background { fill: #101010; } .light { fill: #fff; } .counter { fill: #101010; }</style>
+  <rect class="background" width="40" height="30"/>
+  <g id="monogram">
+    <path id="outer-letter" class="light" d="M5 5H18V25H5Z"/>
+    <path id="counter" class="counter" d="M9 9H14V15H9Z"/>
+    <path id="second-letter" fill="#fdfdfd" d="M22 5H26V21H35V25H22Z"/>
+  </g>
+</svg>

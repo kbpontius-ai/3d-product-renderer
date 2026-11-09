@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="0 0 40 30">
+  <defs>
+    <path id="symbol" d="M0 0H8V8H0ZM2 2H6V6H2Z" fill-rule="evenodd"/>
+    <clipPath id="clip" clipPathUnits="userSpaceOnUse"><rect x="0" y="0" width="5" height="8"/></clipPath>
+  </defs>
+  <use id="instance-one" href="#symbol" x="4" y="4"/>
+  <use id="instance-two" href="#symbol" x="18" y="4"/>
+  <g transform="translate(4 18)" clip-path="url(#clip)"><use id="clipped-instance" href="#symbol"/></g>
+</svg>

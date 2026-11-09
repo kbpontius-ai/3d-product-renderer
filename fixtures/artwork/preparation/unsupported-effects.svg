@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="30mm" height="20mm" viewBox="0 0 30 20">
+  <defs><linearGradient id="shade"><stop stop-color="white"/><stop offset="1" stop-color="black"/></linearGradient></defs>
+  <rect id="gradient" x="2" y="2" width="10" height="10" fill="url(#shade)"/>
+  <circle id="partial-opacity" cx="20" cy="8" r="5" opacity="0.5"/>
+</svg>

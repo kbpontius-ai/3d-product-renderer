@@ -1,0 +1,30 @@
+node_modules/
+dist/
+.next/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+# `.env.example` and `deploy/.env.production.example` are templates, not secrets. A narrower
+# `!.env.example` would miss the deploy one, which the README tells you to copy on a first
+# deployment.
+!.env*.example
+.DS_Store
+scratch/
+.tmp/
+test-results/
+playwright-report/
+
+# The application ships no product content. CAD reaches the catalog by upload through /admin/cad,
+# never by being committed; the synthetic fixtures the test suite names are the deliberate exception.
+*.step
+*.stp
+*.blend
+*.blend1
+!fixtures/cad/carton.step
+!fixtures/cad/closure-38.step
+!fixtures/cad/closure-lined.step
+!fixtures/cad/curved-metrology.step
+
+# Generated CAD library work (STEP, meshes, review scenes): kept locally, far too large for git.
+/output/

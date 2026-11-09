@@ -1,0 +1,175 @@
+{
+  "manifestVersion": 1,
+  "key": "box-basic",
+  "version": "1.0.0",
+  "name": "Basic cartons",
+  "description": "Reference pack for the genericity gate: a folding carton with flat printed panels.",
+  "license": "CC0-1.0",
+  "environments": [
+    "studio-softbox"
+  ],
+  "materials": [
+    {
+      "key": "pp-matte",
+      "name": "Matte",
+      "family": "plastic",
+      "finish": "matte",
+      "colorizable": true,
+      "base": {
+        "baseColorHex": "#1b4d3e",
+        "roughness": 0.62,
+        "metallic": 0,
+        "ior": 1.49,
+        "specular": 0.45
+      }
+    },
+    {
+      "key": "pp-gloss",
+      "name": "Glossy",
+      "family": "plastic",
+      "finish": "pearlescent",
+      "colorizable": true,
+      "base": {
+        "baseColorHex": "#dfe4ea",
+        "roughness": 0.28,
+        "metallic": 0,
+        "ior": 1.49,
+        "specular": 0.55,
+        "clearcoat": 0.55,
+        "clearcoatRoughness": 0.1,
+        "sheen": 0.35
+      }
+    }
+  ],
+  "products": [
+    {
+      "key": "carton-tuck",
+      "name": "Straight tuck carton",
+      "category": "cartons",
+      "facets": {
+        "style": "straight-tuck",
+        "boardGsm": 350
+      },
+      "variants": [
+        {
+          "key": "std",
+          "name": "80 x 120 x 40 mm",
+          "dimensionsMm": {
+            "bbox": [
+              [
+                -40,
+                0,
+                -20
+              ],
+              [
+                40,
+                120,
+                20
+              ]
+            ],
+            "width": 80,
+            "height": 120,
+            "depth": 40
+          },
+          "assets": {
+            "lod0": {
+              "path": "meshes/carton-tuck/std/lod0.glb"
+            },
+            "renderMesh": {
+              "path": "meshes/carton-tuck/std/render.glb"
+            }
+          },
+          "materialSlots": [
+            {
+              "key": "board",
+              "label": "Board",
+              "defaultMaterialKey": "pp-matte",
+              "allowedFamilies": [
+                "plastic"
+              ],
+              "colorizable": true,
+              "allowedFinishes": []
+            }
+          ],
+          "zones": [
+            {
+              "type": "flat_panel",
+              "key": "front",
+              "name": "Front panel",
+              "panelId": "P1",
+              "uvRect": {
+                "u0": 0.02,
+                "v0": 0.02,
+                "u1": 0.4,
+                "v1": 0.62
+              },
+              "sizeMm": {
+                "width": 80,
+                "height": 120,
+                "safeMarginMm": 4
+              },
+              "constraints": {
+                "finishes": [
+                  "print"
+                ],
+                "maxDepthMm": 0.1,
+                "minStrokeMm": 0.15,
+                "maxCoverage": 0.95,
+                "wrapWarnDeg": 120
+              }
+            },
+            {
+              "type": "flat_panel",
+              "key": "side",
+              "name": "Side panel",
+              "panelId": "P2",
+              "uvRect": {
+                "u0": 0.42,
+                "v0": 0.02,
+                "u1": 0.61,
+                "v1": 0.62
+              },
+              "sizeMm": {
+                "width": 40,
+                "height": 120,
+                "safeMarginMm": 4
+              },
+              "constraints": {
+                "finishes": [
+                  "print"
+                ],
+                "maxDepthMm": 0.1,
+                "minStrokeMm": 0.15,
+                "maxCoverage": 0.95,
+                "wrapWarnDeg": 120
+              }
+            }
+          ],
+          "cameraPresets": [
+            {
+              "key": "three-quarter",
+              "label": "Three-quarter",
+              "azimuthDeg": 35,
+              "elevationDeg": 20,
+              "radiusScale": 2.2,
+              "focalMm": 85
+            },
+            {
+              "key": "front",
+              "label": "Front",
+              "azimuthDeg": 0,
+              "elevationDeg": 0,
+              "radiusScale": 2.4,
+              "focalMm": 100
+            }
+          ],
+          "capabilities": {
+            "transmission": false,
+            "video": true,
+            "deformable": true
+          }
+        }
+      ]
+    }
+  ]
+}

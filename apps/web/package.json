@@ -1,0 +1,53 @@
+{
+  "name": "@pr/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pr/admin": "workspace:*",
+    "@pr/artwork": "workspace:*",
+    "@pr/artworks": "workspace:*",
+    "@pr/auth": "workspace:*",
+    "@pr/blender": "workspace:*",
+    "@pr/cad": "workspace:*",
+    "@pr/cad-jobs": "workspace:*",
+    "@pr/catalog": "workspace:*",
+    "@pr/db": "workspace:*",
+    "@pr/design-schema": "workspace:*",
+    "@pr/designs": "workspace:*",
+    "@pr/face-view": "workspace:*",
+    "@pr/job-queue": "workspace:*",
+    "@pr/mail": "workspace:*",
+    "@pr/materials": "workspace:*",
+    "@pr/notifications": "workspace:*",
+    "@pr/observability": "workspace:*",
+    "@pr/packfile": "workspace:*",
+    "@pr/placement": "workspace:*",
+    "@pr/raster": "workspace:*",
+    "@pr/render-backend": "workspace:*",
+    "@pr/render-jobs": "workspace:*",
+    "@pr/render-spec": "workspace:*",
+    "@pr/scene": "workspace:*",
+    "@pr/storage": "workspace:*",
+    "@pr/svg": "workspace:*",
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
+    "lucide-react": "^1.43.0",
+    "next": "^15.1.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "three": "^0.185.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "@types/three": "^0.185.4"
+  }
+}

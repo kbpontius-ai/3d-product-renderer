@@ -1,0 +1,108 @@
+# The same confinement as compose.yaml, for a cluster (docs/23-cad-ingestion.md, "Security").
+#
+# UNVERIFIED: never applied to a cluster. A reviewed specification, not a tested artefact.
+#
+# The seccomp profile has to reach the node before this will schedule: put seccomp.json at
+# /var/lib/kubelet/seccomp/profiles/cad-worker.json, by DaemonSet or by image build.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cad-worker
+  labels: { app: cad-worker }
+spec:
+  # Scaling out means more of these. The queue hands each job to exactly one worker and a lease
+  # means one that dies takes only a delay with it.
+  replicas: 1
+  selector:
+    matchLabels: { app: cad-worker }
+  template:
+    metadata:
+      labels: { app: cad-worker }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: Localhost
+          localhostProfile: profiles/cad-worker.json
+
+      containers:
+        - name: cad-worker
+          image: cad-worker:latest
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+
+          env:
+            - name: CAD_SANDBOX
+              value: require
+            - name: CAD_SCRATCH
+              value: /scratch/cad
+            - name: CAD_THREADS
+              value: "2"
+            - name: STORAGE_ROOT
+              value: /storage
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: cad-worker, key: database-url }
+
+          resources:
+            # Requests and limits are equal on purpose: this is Guaranteed QoS, so a heavy import
+            # cannot be evicted halfway through by something noisier landing on the node.
+            requests: { cpu: "2", memory: 4Gi, ephemeral-storage: 1Gi }
+            limits: { cpu: "4", memory: 8Gi, ephemeral-storage: 2Gi }
+
+          volumeMounts:
+            - { name: scratch, mountPath: /scratch }
+            - { name: tmp, mountPath: /tmp }
+            - { name: storage, mountPath: /storage }
+
+          # The parser holds a job for minutes; a probe that only asks whether the process is alive
+          # would restart a worker doing exactly what it should be. The queue's lease is what
+          # actually detects a stuck worker, so there is no liveness probe here on purpose.
+
+      volumes:
+        # Memory-backed, so a supplier's geometry never reaches a disk and never outlives the pod.
+        - name: scratch
+          emptyDir: { medium: Memory, sizeLimit: 4Gi }
+        - name: tmp
+          emptyDir: { medium: Memory, sizeLimit: 256Mi }
+        - name: storage
+          persistentVolumeClaim: { claimName: cad-storage }
+
+      # One job at a time, and its lease lapses if the pod goes away mid-import.
+      terminationGracePeriodSeconds: 30
+
+---
+# Nothing in the cluster needs to reach this pod, and the pod needs Postgres and object storage and
+# nothing else. The parser's own network namespace is empty regardless — this is the outer bound.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cad-worker
+spec:
+  podSelector:
+    matchLabels: { app: cad-worker }
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app: postgres }
+      ports:
+        - { protocol: TCP, port: 5432 }
+    # DNS, without which the database hostname does not resolve.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels: { k8s-app: kube-dns }
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }

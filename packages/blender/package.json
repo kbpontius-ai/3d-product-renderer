@@ -1,0 +1,23 @@
+{
+  "name": "@pr/blender",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pr/artwork": "workspace:*",
+    "@pr/design-schema": "workspace:*",
+    "@pr/materials": "workspace:*",
+    "@pr/placement": "workspace:*",
+    "@pr/render-backend": "workspace:*",
+    "@pr/scene": "workspace:*",
+    "@pr/gltf": "workspace:*"
+  }
+}

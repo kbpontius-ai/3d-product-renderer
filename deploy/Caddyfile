@@ -1,0 +1,34 @@
+# TLS, and the reason it is not optional (F-SHIP-04).
+#
+# The session cookie is `__Host-` prefixed, which mandates `Secure`. Browsers grant
+# `http://localhost` a trustworthy-origin exception and grant a droplet's IP nothing — so over plain
+# http the cookie is discarded and sign-in bounces back to /signin with no error worth reading. TLS
+# is a prerequisite for the product working at all, not a hardening step.
+#
+# Caddy obtains and renews the certificate itself; there is no cron and nothing to remember.
+
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+
+	# Uploads are CAD files and artwork; the app enforces its own per-type ceilings above this.
+	request_body {
+		max_size 256MB
+	}
+
+	reverse_proxy web:3000 {
+		# A Cycles render is minutes on CPU, and the browser holds the request while it is queued.
+		transport http {
+			read_timeout 15m
+			write_timeout 15m
+		}
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}

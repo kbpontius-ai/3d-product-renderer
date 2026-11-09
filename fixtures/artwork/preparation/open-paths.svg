@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="0 0 40 30">
+  <path id="intentional-open-stroke" d="M4 5L10 10L4 15" fill="none" stroke="#111" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+  <path id="open-filled-outline" d="M15 5H25V15H15" fill="#111" stroke="#111" stroke-width="0.5"/>
+  <path id="join-a" d="M5 23H12" fill="none" stroke="#111" stroke-width="1"/>
+  <path id="join-b" d="M14 23H22" fill="none" stroke="#111" stroke-width="1"/>
+  <path id="different-width" d="M24 23H32" fill="none" stroke="#111" stroke-width="2"/>
+</svg>

@@ -1,0 +1,72 @@
+# The CAD worker's runtime confinement (docs/23-cad-ingestion.md, "Security").
+#
+# Every setting here is a control the doc asks for. None of them are defaults, and a deployment that
+# drops one should have to explain which.
+#
+#   docker compose -f deploy/cad-worker/compose.yaml up --build
+#
+# UNVERIFIED: this has never been built or run — the environment it was written in has the Docker
+# CLI but no daemon. Treat it as a reviewed specification rather than a tested artefact, and expect
+# the first real build to want small corrections.
+
+services:
+  cad-worker:
+    build:
+      context: ../..
+      dockerfile: deploy/cad-worker/Dockerfile
+    init: true
+
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?the worker needs a database}
+      STORAGE_ROOT: /storage
+      # Refuse to start rather than parse a stranger's file unconfined.
+      CAD_SANDBOX: require
+      CAD_SCRATCH: /scratch/cad
+      CAD_THREADS: "2"
+      CAD_TIMEOUT_SEC: "600"
+      CAD_MAX_SOURCE_BYTES: "268435456"
+
+    # --- the filesystem -------------------------------------------------------------------------
+    # Nothing on the root filesystem may be written, so an exploit cannot leave anything behind for
+    # the next process to run. Everything the job needs to write goes on a tmpfs with a size cap,
+    # which also means the supplier's geometry never reaches a disk and never outlives the container.
+    read_only: true
+    tmpfs:
+      - /scratch:size=4g,mode=1777,noexec,nosuid,nodev
+      - /tmp:size=256m,mode=1777,noexec,nosuid,nodev
+    volumes:
+      - cad-storage:/storage
+
+    # --- privilege ------------------------------------------------------------------------------
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt:
+      # No path from here to more privilege than it started with, even through a setuid binary.
+      - no-new-privileges:true
+      # Widened from the default in exactly one place — the namespace syscalls the inner sandbox is
+      # built from. The file says why, and what it costs.
+      - seccomp:./seccomp.json
+
+    # --- resources ------------------------------------------------------------------------------
+    # A malformed shape can spin in tessellation and take a machine with it, no exploit required.
+    # These are the ceiling; the parser also puts lower ones on itself through prlimit, so the
+    # failure says which limit was hit rather than just "the container died".
+    pids_limit: 256
+    mem_limit: 8g
+    memswap_limit: 8g
+    cpus: "4"
+    restart: unless-stopped
+
+    # The worker holds one job at a time and its lease lapses if it dies, so a slow stop costs a
+    # delay rather than a lost import.
+    stop_grace_period: 30s
+
+volumes:
+  cad-storage:
+
+# --- what is deliberately NOT here ------------------------------------------------------------
+#
+# `network_mode: none`, which docs/23 asks for. The supervisor needs Postgres and object storage, so
+# the container cannot be offline — and the parser, which is the part that must be, gets an empty
+# network namespace of its own from the inner sandbox instead. That is a weaker arrangement than two
+# containers and it is the reason the inner sandbox exists at all; see README.md.

@@ -1,0 +1,13 @@
+[extend]
+useDefault = true
+
+# Exact values, not paths: these are the fixed passwords the e2e suite and the auth tests sign in
+# with, and they protect nothing outside a throwaway test database. Allowlisting the test
+# directories instead would also hide a real credential pasted into one of them.
+[[allowlists]]
+description = "Synthetic test-account passwords"
+regexes = [
+  '''^Chamfer-Ink-Ridge-8821$''',
+  '''^Sheen-Matte-Bevel-4407$''',
+  '''^Torque-Bevel-92-Cap$''',
+]

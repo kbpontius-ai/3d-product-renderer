@@ -1,0 +1,24 @@
+{
+  "name": "@pr/catalog",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pr/db": "workspace:*",
+    "@pr/design-schema": "workspace:*",
+    "@pr/scene": "workspace:*",
+    "@pr/storage": "workspace:*",
+    "@pr/artwork": "workspace:*"
+  },
+  "devDependencies": {
+    "@pr/designs": "workspace:*"
+  }
+}

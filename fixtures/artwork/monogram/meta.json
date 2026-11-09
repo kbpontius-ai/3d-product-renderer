@@ -1,0 +1,19 @@
+{
+  "key": "monogram",
+  "name": "Monogram (fixture)",
+  "naturalSizeMm": {
+    "w": 32,
+    "h": 16
+  },
+  "mmPerPx": 0.04,
+  "widthPx": 800,
+  "heightPx": 400,
+  "sdfRangeMm": [
+    -7.798951,
+    1.621463
+  ],
+  "stats": {
+    "coverage": 0.2647,
+    "minStrokeMm": 0.56
+  }
+}

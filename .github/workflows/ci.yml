@@ -1,0 +1,466 @@
+name: CI
+
+# Runs on every pull request, and on demand. Local checks are still required before a change is
+# offered for review. `pull_request`, never `pull_request_target`: a fork's code must not run with
+# this repository's token or secrets.
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Every job has a ceiling of roughly one and a half times its slowest green run. Without one a job
+  # gets GitHub's six-hour default, and a breakage that makes each test wait out its own timeout
+  # looks like a slow run rather than a failed one: an e2e run once went 56 minutes, failing 40
+  # tests one after another, before anyone cancelled it.
+  secrets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    # Both scanners read the whole history, not just the pull request's commits: a secret is just as
+    # exposed in a commit the branch inherited. Each binary is a pinned release whose checksum is
+    # checked before it runs, so a moved tag or a tampered download fails instead of executing.
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      TRUFFLEHOG_VERSION: 3.99.2
+      TRUFFLEHOG_SHA256: 3c7b0d1dc4278294269bfdd7594bca8bb28c78da0a4a06ad202ded37b48deca4
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Gitleaks and TruffleHog
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP"
+          curl -fsSLo gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf gitleaks.tar.gz -C bin gitleaks
+          curl -fsSLo trufflehog.tar.gz "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          echo "${TRUFFLEHOG_SHA256}  trufflehog.tar.gz" | sha256sum -c -
+          tar -xzf trufflehog.tar.gz -C bin trufflehog
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Gitleaks
+        run: gitleaks git --config .gitleaks.toml --redact --verbose --exit-code 1 .
+
+      - name: TruffleHog
+        # Verified and unknown results only. An unverified match is a string shaped like a credential
+        # that its provider rejected, such as the throwaway database URLs the tests use.
+        # The one excluded file feeds fake credentials to the CAD sandbox to prove they are stripped;
+        # its database URL reads as "unknown" only because its host does not exist. TruffleHog has no
+        # per-value allowlist, so the file is named exactly. Gitleaks still scans it.
+        run: trufflehog git "file://$PWD" --results=verified,unknown --exclude-paths .trufflehog-exclude --fail --no-update
+
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+
+    services:
+      postgres:
+        # Bootstrapped as `postgres`, deliberately. Naming the application role in POSTGRES_USER
+        # makes it the cluster's *superuser*, and RLS does not apply to a superuser — see the
+        # "Create the application role" step below.
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: product_renderer
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      # Integration tests create a private database per file and drop it afterwards.
+      DATABASE_URL: postgres://product_renderer:product_renderer@127.0.0.1:5432/product_renderer
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create the application role
+        # `product_renderer` has to be an ordinary role, because `force row level security` forces policies
+        # on the table *owner* and does not touch a superuser: a superuser bypasses every policy,
+        # silently. This service used to name `product_renderer` in POSTGRES_USER, which is the name the
+        # image bootstraps its superuser under — so every tenancy assertion in CI ran against a
+        # database that was not enforcing the thing being asserted, and had never once run
+        # meaningfully. `createdb` because the integration suite makes a private database per file.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres \
+            -c "create role product_renderer login password 'product_renderer' createdb"
+          psql -h 127.0.0.1 -U postgres -d postgres \
+            -c "alter database product_renderer owner to product_renderer"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      # Documentation drifts because nothing checks it: ten CAD_* variables existed in code and
+      # nowhere in the README, and nothing would ever have said so.
+      - name: Environment reference is complete
+        run: pnpm check:env
+
+      # OCCT, so the CAD importer's conformance suite runs against a real kernel rather than
+      # skipping itself. Without this the suite still passes — it is skipped-not-failed by design —
+      # which is exactly why it has to be installed somewhere that notices.
+      - name: Install the CAD kernel
+        run: pip install --no-cache-dir cadquery-ocp==7.9.3.1.1
+
+      # Runners try Azure's Ubuntu mirror first. It has stalled for minutes per file and cost whole
+      # runs, while archive.ubuntu.com, next in the list, served the same file in two seconds.
+      - name: Skip the Azure package mirror
+        run: sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+
+      - name: Install the renderer and enable the Linux sandbox tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender python3-numpy
+          # This disposable runner must exercise unprivileged namespaces, not skip their tests.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          blender --version
+
+      # Unit suite includes the two-pack conformance gate (F-GEN-09): every placement behaviour is
+      # exercised against both a curved closure and a flat carton.
+      - name: Unit tests
+        run: pnpm test
+
+      # A tessellator's regression suite is a set of files, not a set of assertions. This is the
+      # cheap half of that: the committed fixtures must still be what OCCT writes for them.
+      - name: CAD fixtures are reproducible
+        run: |
+          pnpm fixtures:cad
+          git diff --exit-code fixtures/cad
+
+      - name: Fixture artwork is reproducible
+        run: |
+          pnpm fixtures:artwork
+          git diff --exit-code fixtures/artwork
+
+      - name: Build web app
+        run: pnpm build:web
+
+      # A budget nothing enforces is a wish (docs/19-frontend.md). The editor legitimately ships
+      # three.js and a GLTF loader; what this catches is that growing without anyone deciding it
+      # should, and a stray import putting a WebGL renderer on the sign-in page.
+      - name: Bundle budgets
+        run: pnpm bundle:budget
+
+  e2e:
+    runs-on: ubuntu-24.04
+    # Three parallel jobs of one worker each: two software-WebGL browsers on a two-core runner time
+    # out across the 3D specs, and the whole suite on one worker takes 23 to 37 minutes. The groups
+    # are by measured cost, because `--shard` splits by test count and put every heavy 3D spec in one
+    # job. `rest` is defined by what the others take, so a new spec cannot fall out of the run.
+    # Playwright's own 25-minute limit should end a group first, with its report written; the job
+    # limit leaves room for setup, which has taken up to 11 minutes.
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: orientation
+            selection: orientation.spec.ts placement-color.spec.ts cross-section.spec.ts artwork.spec.ts artwork-archive.spec.ts
+          - group: designs
+            selection: designs.spec.ts snapshot.spec.ts artwork-preparation.spec.ts loading-states.spec.ts packs.spec.ts catalog-thumbnails.spec.ts status.spec.ts
+          - group: rest
+            selection: --grep-invert '(orientation|placement-color|cross-section|artwork|artwork-archive|designs|snapshot|artwork-preparation|loading-states|packs|catalog-thumbnails|status|parity|render)\.spec\.ts'
+    needs: verify
+
+    services:
+      postgres:
+        # Bootstrapped as `postgres`, deliberately. Naming the application role in POSTGRES_USER
+        # makes it the cluster's *superuser*, and RLS does not apply to a superuser — see the
+        # "Create the application role" step below.
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: product_renderer
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://product_renderer:product_renderer@127.0.0.1:5432/product_renderer
+      # The account tests need an invitation endpoint and a mailbox; the suite runs a production
+      # build, so the production acknowledgement is set too. Never set either in a real deployment.
+      DEV_TOOLING: 'true'
+      # Not a secret: a fixed value so the suite signs and verifies the same way twice.
+      ASSET_URL_SECRET: 'e2e-asset-signing-secret'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create the application role
+        # `product_renderer` has to be an ordinary role, because `force row level security` forces policies
+        # on the table *owner* and does not touch a superuser: a superuser bypasses every policy,
+        # silently. This service used to name `product_renderer` in POSTGRES_USER, which is the name the
+        # image bootstraps its superuser under — so every tenancy assertion in CI ran against a
+        # database that was not enforcing the thing being asserted, and had never once run
+        # meaningfully. `createdb` because the integration suite makes a private database per file.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres \
+            -c "create role product_renderer login password 'product_renderer' createdb"
+          psql -h 127.0.0.1 -U postgres -d postgres \
+            -c "alter database product_renderer owner to product_renderer"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      # Runners try Azure's Ubuntu mirror first. It has stalled for minutes per file and cost whole
+      # runs, while archive.ubuntu.com, next in the list, served the same file in two seconds.
+      - name: Skip the Azure package mirror
+        run: sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
+      - run: pnpm import:pack fixtures/packs/cap-basic --publish
+      - run: pnpm import:pack fixtures/packs/bottle-oval --publish
+      - run: pnpm import:pack fixtures/packs/box-basic --publish
+      - run: pnpm build:web
+
+      - name: Start the reference CAD worker for synthetic E2E inputs
+        run: |
+          nohup pnpm worker:cad > cad-worker.log 2>&1 &
+          for _ in $(seq 1 30); do
+            grep -q 'cad worker ready' cad-worker.log && exit 0
+            sleep 1
+          done
+          cat cad-worker.log
+          exit 1
+        env:
+          CAD_IMPORTER: reference
+
+      - name: End-to-end suite (placement, artwork upload, account lifecycle)
+        run: pnpm e2e --workers=1 ${{ matrix.selection }}
+        env:
+          CI: 'true'
+          CHROMIUM_PATH: ''
+          E2E_CAD_WORKER: 'true'
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.group }}
+          path: playwright-report/
+          retention-days: 7
+
+  # Preview-versus-render parity (I1). Separate from the e2e job because it needs a renderer, and
+  # because a path tracer on a shared runner is slow enough that it should not hold up the rest.
+  parity:
+    runs-on: ubuntu-24.04
+    # Green runs take 16 to 22 minutes with the wider camera grid.
+    timeout-minutes: 30
+    needs: verify
+
+    services:
+      postgres:
+        # Bootstrapped as `postgres`, deliberately. Naming the application role in POSTGRES_USER
+        # makes it the cluster's *superuser*, and RLS does not apply to a superuser — see the
+        # "Create the application role" step below.
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: product_renderer
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    env:
+      DATABASE_URL: postgres://product_renderer:product_renderer@127.0.0.1:5432/product_renderer
+      DEV_TOOLING: 'true'
+      ASSET_URL_SECRET: 'e2e-asset-signing-secret'
+      # Two threads, not every core: the browser driving the editor needs the runner too.
+      RENDER_THREADS: '2'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create the application role
+        # `product_renderer` has to be an ordinary role, because `force row level security` forces policies
+        # on the table *owner* and does not touch a superuser: a superuser bypasses every policy,
+        # silently. This service used to name `product_renderer` in POSTGRES_USER, which is the name the
+        # image bootstraps its superuser under — so every tenancy assertion in CI ran against a
+        # database that was not enforcing the thing being asserted, and had never once run
+        # meaningfully. `createdb` because the integration suite makes a private database per file.
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h 127.0.0.1 -U postgres -d postgres \
+            -c "create role product_renderer login password 'product_renderer' createdb"
+          psql -h 127.0.0.1 -U postgres -d postgres \
+            -c "alter database product_renderer owner to product_renderer"
+
+      # Runners try Azure's Ubuntu mirror first. It has stalled for minutes per file and cost whole
+      # runs, while archive.ubuntu.com, next in the list, served the same file in two seconds.
+      - name: Skip the Azure package mirror
+        run: sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+
+      # Ubuntu 24.04 ships Blender 4.0.2, which is the version the worker probes for. numpy is not
+      # optional: without it Blender's glTF importer fails and every render comes back empty.
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends blender python3-numpy
+          blender --version
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm db:migrate
+      - run: pnpm import:pack fixtures/packs/cap-basic --publish
+      - run: pnpm import:pack fixtures/packs/box-basic --publish
+      - run: pnpm build:web
+
+      - name: Start the render worker
+        run: |
+          nohup pnpm worker:render > render-worker.log 2>&1 &
+          # The worker refuses to start without a usable Blender, so waiting for it to say so is
+          # also the check that this runner can render at all.
+          for _ in $(seq 1 30); do
+            grep -q 'render worker ready' render-worker.log && exit 0
+            sleep 2
+          done
+          echo 'the render worker never came up:'
+          cat render-worker.log
+          exit 1
+
+      - name: Preview, queued settings and render lifecycle agree
+        run: pnpm e2e parity.spec.ts render.spec.ts --workers=1
+        env:
+          CI: 'true'
+          CHROMIUM_PATH: ''
+          E2E_RENDER_WORKER: 'true'
+
+      # The two pictures and the difference between them. A parity failure is a visual fact, and a
+      # number in a log is not something anyone can act on.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: parity-report
+          path: |
+            playwright-report/
+            test-results/
+            render-worker.log
+          retention-days: 7
+
+  # The deployment images, actually built and actually started.
+  #
+  # Everything above this job tests the code; nothing tested the thing that ships it, so a Dockerfile
+  # could rot for months and the first sign would be a failed deploy. Three specific failures this
+  # catches, all of which were present when the images were first written and none of which any
+  # amount of reading reliably finds: a runtime image whose Blender is the wrong series for the
+  # parity budgets, an entrypoint binary that is not in the image, and a `migrate` one-shot that
+  # cannot start — which, because `web` waits on it, means nothing starts.
+  #
+  # Built through the compose file rather than `docker build`, so what CI exercises is what an
+  # operator runs. The CAD image is deliberately not built here: it is behind a profile, off by
+  # default, and pip-installing OCCT costs more CI minutes than an off-by-default worker is worth.
+  images:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Values, not secrets. The stack never leaves the runner and Caddy is not started, so nothing
+      # here is reachable and nothing needs to be real.
+      - name: Settings for a throwaway stack
+        working-directory: deploy
+        run: |
+          cat > .env <<'ENV'
+          APP_DOMAIN=localhost
+          ACME_EMAIL=ci@example.invalid
+          APP_URL=https://localhost
+          POSTGRES_SUPERUSER_PASSWORD=ci-superuser-not-a-secret
+          POSTGRES_APP_PASSWORD=ci-app-not-a-secret
+          ASSET_URL_SECRET=ci-asset-signing-key-not-a-secret
+          ENV
+
+      - name: Build the images
+        working-directory: deploy
+        run: docker compose build web worker-render
+
+      # `--wait` is the assertion. Reaching healthy means PostgreSQL bootstrapped, the `migrate`
+      # one-shot ran to completion against the ordinary application role, and /api/health found both
+      # the database and the object store — see the healthcheck in compose.yaml.
+      - name: Boot the stack and serve a request
+        working-directory: deploy
+        run: docker compose up -d --wait web
+        timeout-minutes: 10
+
+      # The one that matters most and is invisible when wrong. A superuser bypasses every row-level
+      # security policy silently, including under `force row level security`, so if the application
+      # role is one, every tenancy guarantee in the product is off with nothing to see. The suite
+      # above cannot catch it: those tests pass either way.
+      - name: The application role is not a superuser
+        working-directory: deploy
+        run: |
+          super=$(docker compose exec -T postgres \
+            psql -U postgres -d product_renderer -tAc \
+            "select rolsuper from pg_roles where rolname = 'product_renderer'")
+          echo "product_renderer.rolsuper = ${super}"
+          test "${super}" = "f"
+
+      # Starting is a lower bar than rendering, but it is the bar that was not being cleared: the
+      # worker resolves its entrypoint, loads every @pr/* workspace import, and connects to the
+      # queue. A Cycles render on a CI runner is minutes and belongs in the parity job.
+      - name: The render worker starts and stays up
+        working-directory: deploy
+        run: |
+          docker compose up -d worker-render
+          for _ in $(seq 1 15); do
+            state=$(docker inspect -f '{{.State.Status}}' "$(docker compose ps -q worker-render)")
+            [ "${state}" = "running" ] || { echo "worker-render is ${state}"; docker compose logs worker-render; exit 1; }
+            sleep 2
+          done
+          echo 'worker-render still running after 30s'
+
+      # Blender is the reason the render image is Ubuntu rather than the Node image's Debian, so the
+      # version is worth printing where a human will see it when a parity budget moves.
+      - name: Record the Blender the worker will use
+        working-directory: deploy
+        run: docker compose run --rm --no-deps --entrypoint blender worker-render --version | head -2
+
+      - name: Logs, if any of that failed
+        if: failure()
+        working-directory: deploy
+        run: docker compose logs --no-color --tail 200

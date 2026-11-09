@@ -1,0 +1,23 @@
+{
+  "name": "@pr/worker-render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts --role=render-worker",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@pr/artwork": "workspace:*",
+    "@pr/blender": "workspace:*",
+    "@pr/db": "workspace:*",
+    "@pr/design-schema": "workspace:*",
+    "@pr/job-queue": "workspace:*",
+    "@pr/mail": "workspace:*",
+    "@pr/notifications": "workspace:*",
+    "@pr/observability": "workspace:*",
+    "@pr/render-backend": "workspace:*",
+    "@pr/render-jobs": "workspace:*",
+    "@pr/storage": "workspace:*"
+  }
+}
