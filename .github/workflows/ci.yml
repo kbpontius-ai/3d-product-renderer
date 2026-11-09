@@ -167,6 +167,10 @@ jobs:
         run: pnpm bundle:budget
 
   e2e:
+    # Without a name GitHub calls each check after the whole matrix entry, test list included, and
+    # branch protection requires those exact names, so moving a spec between groups would leave
+    # `main` waiting on checks that no longer exist.
+    name: e2e (${{ matrix.group }})
     runs-on: ubuntu-24.04
     # Three parallel jobs of one worker each: two software-WebGL browsers on a two-core runner time
     # out across the 3D specs, and the whole suite on one worker takes 23 to 37 minutes. The groups
